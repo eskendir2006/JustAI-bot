@@ -1,0 +1,21 @@
+var geocoder_api = $injector.geocoder_api;
+var weather_api = $injector.weather_api;
+var weather1_api = $injector.weather1_api;
+function openWeatherMap(lon,lat, date){
+    
+    return $http.get("https://api.openweathermap.org/data/3.0/onecall/day_summary?lon=${lon}&lat=${lat}&date=${date}&appid=${key}&units=metric", {
+        timeout: 10000,
+        query:{
+            
+            key : weather_api,
+            date : date,
+            lon : lon,
+            lat : lat
+            
+        }
+        
+        
+    })
+    
+}
+//https://api.openweathermap.org/data/3.0/onecall/day_summary?q=${q}&date=${date}&appid=${key} https://api.openweathermap.org/data/2.5/weather?q=${q}&appid=${id}&units=metric&lang=ru
