@@ -1,0 +1,24 @@
+name: zb-cailapub
+
+entryPoint: main.sc
+
+botEngine: v2
+language: ru
+
+tests:
+  include:
+    - test.xml
+
+nlp:
+  intentNoMatchThresholds:
+    phrases: 0.2
+    patterns: 0.2
+injector:
+    geocoder_api: "f47a82b0-b273-401a-ada1-a98597a93609"
+    weather_api: "c26b2f960194274fc09a0dafd64128cb"
+    weather1_api: "fd86ca7a18924f9d9bf80231232111"
+    
+    slotfilling:
+        maxSlotRetries: 2
+        stopOnAnyIntent: false
+        stopOnAnyIntentThreshold: 0.2
