@@ -1,0 +1,7 @@
+patterns:
+    $greeting =  ( Меня ~звать / Я / Мое имя )
+    $queryWeather = ( * ~погода* [в] / а [в] )
+    $someWord = *
+    $affirm = (*да* / *конечно / ~хочу / ~поеду)
+    $negat = (*нет* / не [(хочу/поеду)] )
+    $test = test
