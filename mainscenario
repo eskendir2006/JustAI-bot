@@ -1,0 +1,327 @@
+require: functions.js
+require: patterns.sc
+
+theme: /
+
+    state: Start
+        q!: $regex</start>
+        script:
+            $session.neededCity = "";
+            $session.neededDate = "";
+            $session.cityTemp = 0;
+            $session.tempMet = false;
+            $session.formStarted = false;
+            $session.phoneNumber = false;
+            $session.f1 = false;
+            $session.f2 = false;
+            $session.f3 = false;
+            $session.f4 = false;
+            $session.f5 = false;
+            $session.f6 = false;
+            $session.f7 = false;
+            $session.f8 = false;
+            $session.f9 = false;
+            $session.f10 = false;
+            $session.first = false;
+            $session.wantedCity = false;
+            $session.wantedDate = false;
+            
+        if: !$client.name
+            a: Здравствуйте! Я электронный помощник туристической компании "Just Tour". Я могу помочь вам в создании заявки для тура а также узнать погоду в городе, куда вы хотите поехать! Чем могу быть полезен?
+        else:
+            random:
+                a: Здравствуйте, {{$client.name}}! К вашим услугам!
+                a: Здравствуйте, {{$client.name}}! Чем помочь на этот раз?
+                a: Здравствуйте, {{$client.name}}! Чем могу быть полезен сегодня?
+        go!: /Buffer
+        
+        
+    state: Buffer
+        buttons:
+            "Сделать заявку." -> /CreateForm
+            "Узнать погоду" -> /WeatherMid
+
+    state: WeatherMid
+        a: Пожалуйста, напишите город и дату с припиской "погода".
+        go: /GetWeather
+    
+    state: GetClientName || noContext = true
+        q!: {[$greeting]  @pymorphy.name *}
+        script:
+            $client.name = $parseTree["_pymorphy.name"];
+        random:
+            a: Приятно познакомиться, {{$client.name}}! И что же мне сделать для вас?
+            a: У вас хорошее имя! Как я могу помочь вам?
+            a: А меня Кешей зовут! Чем могу быть полезен?
+    
+    state: GetWeather || noContext = true 
+        q!: { $queryWeather [@mystem.geo] [someWord] [@duckling.date] }
+        script:
+            
+            if($parseTree["_mystem.geo"]){
+                
+                if(!$session.neededCity || $session.neededCity != $parseTree["_mystem.geo"])$session.neededCity = $parseTree["_mystem.geo"];    
+                
+            }
+            else{
+                
+                if(!$session.neededCity) $reactions.answer("Вы не написали город!");
+                
+            }
+            if($parseTree["_duckling.date"]){
+                
+                var temp = $parseTree["_duckling.date"].value;
+                var temp1 = temp.slice(0,10);
+                if(!$session.neededDate || $session.neededDate != temp1 )$session.neededDate = temp1;
+                
+            }
+            else{
+            
+                if(!$session.neededDate) $reactions.answer("Вы не написали дату!");  
+                
+            }
+            if($session.neededCity && $session.neededDate){
+                
+                var city = $session.neededCity;
+                var date = $session.neededDate;
+                    
+                var url = "https://api.openweathermap.org/data/2.5/weather?q="+city+"&appid="+weather_api+"&units=metric&lang=ru"
+                var q = $http.get(url);
+                var lon = q.data.coord.lon;
+                var lat = q.data.coord.lat;
+                openWeatherMap(lon,lat, date).then(function (query){
+                        
+                    log("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" + toPrettyString(query));
+                    var average = (query.temperature.min + query.temperature.max) / 2;
+                    $reactions.answer("Температура в городе "+capitalize($session.neededCity)+" на дату "+ $session.neededDate + " : " + average + " градусов");
+                    $session.cityTemp = average;
+                    $session.tempMet = true;
+                }).catch(function(err){
+                    
+                    $reactions.answer("AHAHHAHAH");    
+                        
+                });
+            
+                
+            }
+            log("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"+toPrettyString($parseTree));
+            
+        if: $session.cityTemp <= 5 && $session.tempMet
+            a: Вы точно хотите поехать в страну с холодным климатом?
+        elseif: $session.cityTemp >= 27 && $session.tempMet
+            a: Вы точно хотите поехать в страну с жарким климатом?
+        elseif: $session.tempMet
+            a: Вы точно хотите поехать в страну с умеренным климатом?
+        if: $session.tempMet
+            buttons:
+                "Да!" -> /StartTour
+                "Нет." -> /NegativeWeather
+    
+    state: NegativeWeather
+        script:
+            $session.neededCity = "";
+            $session.neededDate = "";
+        random:
+            a: Тогда напишите другое место куда вы хотите пойти!
+            a: Посмотрим погоду в других местах!
+            a: Тогда давайте посмотрим погоду в других местах!
+        go: /GetWeather
+    state: StartTour
+        if: $session.formStarted
+            a: Хотите ли продолжить заявку?
+        else:
+            a: Хотите ли создать заявку?
+        buttons:
+            "Да." -> /CreateForm
+            "Нет." -> /NegativeWeather
+    
+    state: CreateForm
+        intent!: /форма
+        if: !$session.first
+            a: Ну что же, тогда начнем. Я буду спрашивать вопросы, которые нужны для создания заявки. По возможности, пожалуйста ответьте на все вопросы.
+            script:
+                $session.first = true;
+        
+        if: $session.neededCity
+            script:
+                $session.wantedCity = $session.neededCity;
+        
+        if: !$session.wantedCity
+            go!: ./Choice
+        
+        if: !$session.f1
+            script:
+                $session.f1 = true;
+            go!: /NumberOfPeople
+        if: !$session.f2
+            script:
+                $session.f2 = true;
+            go!: /NumberOfChildren
+        if: !$session.f3
+            script:
+                $session.f3 = true;
+            go!: /Budget
+        if: $session.neededDate
+            script:
+                $session.wantedDate = $session.neededDate;
+        if: !$session.wantedDate
+            go!: /Date
+        if: !$session.f5
+            script:
+                $session.f5 = true;
+            go!: /Duration
+        if: !$session.f6
+            script:
+                $session.f6 = true;
+            go!: /Stars
+        
+        if: !$client.name
+            a: Напишите свое имя пожалуйста
+            go: ./MandatoryName
+        
+        if: $session.phoneNumber
+            script:
+                $client.phoneNumber = $session.phoneNumber;
+        
+        if: !$client.phoneNumber
+            go!: /PhoneNumber
+            
+        if: !$session.f7
+            script:
+                $session.f7 = true;
+            go!: /Commentary
+        
+        go!: /SendEmail
+        
+        
+        state: MandatoryName 
+            
+            q: * @pymorphy.name * 
+            script:
+                $client.name = $parseTree["_pymorphy.name"];
+            go!: /CreateForm
+            state: localNoMatch || noContext = true
+                event: noMatch
+                random:
+                    a: Ваше имя обязательно чтобы продолжить с заявкой.
+                    a: Это не похоже на имя. Напишите свое имя для того чтобы продолжить оформление.
+                    a: Ваше имя очень важно для продолжения заявки. Оно нужно сотруднику компании, которому нужно будет обслуживать ваш тур.
+                
+    
+        
+        
+        state: Choice
+            a: Определились ли вы уже с городом куда вы хотите поехать?
+            buttons:
+                "Да." -> /Meow
+                "Нет." -> /Unknown
+            state: Click
+                q: * || fromState = "/CreateForm/Choice" , onlyThisState = true
+                a: Пожалуйста, нажмите кнопку.
+                go!: ..
+            state: MandatoryCity
+        
+                q: @mystem.geo 
+                script:
+                    $session.wantedCity = $parseTree["_mystem.geo"];
+                a: Прекрасно! Тогда продолжим с заявкой!
+                go!: /CreateForm
+                state: localCatchAll || noContext = true
+                    event: noMatch
+                    random: 
+                        a: Такого города не сущевствует. 
+                        a: Напишите название города правильно.
+                    
+    
+    
+    
+    state: Meow
+        a: Напишите город.
+        go: /CreateForm/Choice/MandatoryCity
+    
+    
+    state: Unknown
+        a: Тогда, вы можете обсудить город куда вы хотите поехать с менеджером. Ему будет отправлено сообщение по этому поводу.
+        script:
+            $session.wantedCity = "Needs consulting";
+        go!: /CreateForm
+    
+    
+    state: SendEmail
+        Email:
+            destination = 2006esken@gmail.com
+            subject = ClientRequest
+            text = NumPeople: {{$session.numberOfPeople}}, NumCh: {{$session.numberOfChildren}}, Budget: {{$session.budget}}, WDate: {{$session.wantedDate}}, Duration: {{$session.duration}}, NStars: {{$session.stars}}, CName: {{$client.name}}, CPhone: {{$client.phoneNumber}}, Comm: {{$session.commentary}}
+            okState = /SendEmail/OK
+            errorState = /SendEmail/Error
+        state: OK
+            a: Все! Ваша заявка была отправлена нашему сотруднику и он свяжется с вами в скором будущем! На этом моя миссия была завершена. До свидания вам!
+        state: Error
+            a: Случились неполадки во время отправления сообщения. Рекоммендую обратиться за подбором тура в компанию по телефону 8(812)000-00-00.
+    
+    state: NumberOfPeople
+        InputText:
+            varName = numberOfPeople
+            prompt = Сколько людей в поездке?
+            then = /CreateForm
+        
+    state: NumberOfChildren
+        InputText:
+            varName = numberOfChildren
+            prompt = Сколько из них детей?
+            then = /CreateForm
+            
+    state: Budget
+        InputText:
+            varName = budget
+            prompt = Какой у вас бюджет?
+            then = /CreateForm
+            
+    state: Date
+        InputText:
+            varName = wantedDate
+            prompt = Когда вы хотите поехать?
+            then = /CreateForm
+            
+    state: Duration
+        InputText:
+            varName = duration
+            prompt = Сколько вы хотите там быть?
+            then = /CreateForm
+            
+    state: Stars
+        InputText:
+            varName = stars
+            prompt = Сколько звезд должно быть у отеля?
+            then = /CreateForm
+            
+    state: PhoneNumber
+        InputPhoneNumber:
+            varName = phoneNumber
+            prompt = Нам нужен ваш номер телефона. Он нужен чтобы наш оператор мог связаться с вами по поводу вашей заявки.
+            failureMessage = ["Ваш номер обязателен чтобы я мог его отправить оператору, введите его пожалуйста", "Пожалуйста, назовите корректный номер телефона."]
+            then = /CreateForm
+            
+    state: Commentary
+        InputText:
+            varName = commentary
+            prompt = А теперь, вы можете оставить комментарий нашему оператору. После отправки формы оператору, он может свободно увидеть что вы написали сюда.
+            then = /CreateForm
+    
+    state: CatchAll || noContext=true
+        event!: noMatch
+        random:
+            a: Я до конца не понял того, что вы мне сказали. Я бы хотел чтобы вы подошли ближе к делу.
+            a: Я вас не понимаю. Вы хотите чтобы я узнал погоду или оформил заявку для тура?
+            a: Можете перефразировать для меня, пожалуйста?
+            
+            
+    state: Help
+        intent!: /помощь
+        a: Я - бот JustAI, я умею узнавать погоду и делать заявки для туров. Чтобы узнать погоду вам следует написать запрос, содержащий город, дату и слово "погода"! Без слова "погода" бот погоду искать не будет!
+    state: Abilities
+        intent!: /умею
+        a: Я умею: узнавать погоду и делать заявки для туров. Чтобы узнать погоду вам следует написать город, дату и слово "погода". В таком случае бот сможет вам ответить! Для успешного выполнения заявки вам следует слушаться бота и его инструкции. После этого, сессия считается выполненной.
+        
+        
+
